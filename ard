@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+
+# handle arduino command line jobs
+# by DJ0ABR
+
+# safety exists
+set -e  # exit on error
+set -u  # exit on undefined variable use
+
+# check if required tools are installed
+for cmd in "arduino-cli" "esptool.py" "mklittlefs" "python3"; do
+  if ! command -v $cmd &> /dev/null; then
+    echo "Error: $cmd is not installed."
+    exit 1
+  fi
+done
+
+# =========================================
+# adapt these settings to the board
+# find the board with: arduino-cli board listall | grep myboard
+BOARD="esp32:esp32:esp32"
+PARTITION="default"
+BAUDRATE=921600
+USBPORT="/dev/ttyUSB0"
+IPADDRESS="192.168.10.83"
+# =========================================
+
+# fixed flash addresses
+BOOTLOADERADDRESS=0x1000
+PARTITIONADDRESS=0x8000
+APPSTARTADRESS=0x10000
+# check these numbers according the partition scheme file !
+# see: ~/.arduino15/packages/esp32/hardware/esp32/2.0.9/tools/partitions
+# boards and available partitions see:
+# ~/.arduino15/packages/esp32/hardware/esp32/2.0.9/boards.txt
+LITTLEFSADDRESS=0x290000
+LITTLEFSLENGTH=0x160000
+
+compile() {
+    echo "compiling: " "$FILENAME".ino " PartitionScheme: " $PARTITION
+    arduino-cli compile -e --fqbn $BOARD  "$FILENAME".ino --board-options PartitionScheme=$PARTITION
+}
+
+upload_USB() {
+    echo "USB upload " "$FILENAME".ino
+    esptool.py --chip esp32 --port $USBPORT --baud $BAUDRATE write_flash $APPSTARTADRESS build/e*/"$FILENAME".ino.bin
+    esptool.py --chip esp32 --port $USBPORT --baud $BAUDRATE write_flash $PARTITIONADDRESS build/e*/"$FILENAME".ino.partitions.bin
+    # the nvs partition stores the variables "Preferences". It is not cleared by this upload
+}
+
+upload_USB_partition() {
+    echo "USB upload partition table only"
+    esptool.py --chip esp32 --port $USBPORT --baud $BAUDRATE write_flash $PARTITIONADDRESS build/e*/"$FILENAME".ino.partitions.bin
+}
+
+makelittlefs() {
+    echo "make littleFS bin file "
+    mklittlefs -c data -b 4096 -p 256 -s $LITTLEFSLENGTH build/littlefs.bin
+}
+
+upload_littlefs_USB() {
+    echo "USB upload littleFS bin file"
+    esptool.py --chip esp32 --port $USBPORT --baud $BAUDRATE write_flash $LITTLEFSADDRESS build/littlefs.bin
+}
+
+monitor_USB() {
+  arduino-cli monitor -p $USBPORT -c baudrate=115200
+}
+
+clear_flash_USB() {
+  echo "clear flash, erases all data. Please Upload the Bootloader NOW with command b !"
+  esptool.py --chip esp32 --port $USBPORT --baud $BAUDRATE erase_flash
+}
+
+flash_bootloader_USB() {
+  echo "upload bootloader"
+  esptool.py --chip esp32 --port $USBPORT --baud $BAUDRATE write_flash $BOOTLOADERADDRESS build/e*/"$FILENAME".ino.bootloader.bin
+}
+
+upload_WiFi() {
+  echo "upload App via WiFi to IP: " $IPADDRESS
+  python3 /usr/local/bin/espota.py -i $IPADDRESS -f build/e*/"$FILENAME".ino.bin
+}
+
+upload_littlefs_WiFi() {
+  echo "upload App via WiFi to IP: " $IPADDRESS
+  python3 /usr/local/bin/espota.py -i $IPADDRESS -s -f build/littlefs.bin
+}
+
+
+# this script starts here
+
+# get the sketch name, which is similar to the folder name
+current_folder=$(pwd)
+FILENAME=$(basename "$current_folder")
+
+if [ "$1" = "c" ]; then
+  compile
+elif [ "$1" = "u" ]; then
+  upload_USB
+elif [ "$1" = "l" ]; then
+  makelittlefs
+elif [ "$1" = "r" ]; then
+  upload_littlefs_USB
+elif [ "$1" = "m" ]; then
+  monitor_USB
+elif [ "$1" = "x" ]; then
+  clear_flash_USB
+elif [ "$1" = "b" ]; then
+  flash_bootloader_USB
+elif [ "$1" = "v" ]; then
+  upload_WiFi
+elif [ "$1" = "j" ]; then
+  upload_littlefs_WiFi
+elif [ "$1" = "p" ]; then  
+  upload_USB_partition
+else
+  echo "Invalid parameter: $1"
+  echo " "
+  echo "usage:"
+  echo " "
+  echo "CLEAR"
+  echo "  ard x ... clear complete flash (requires flashing the bootloader!)"
+  echo " "
+  echo "COMPILE"
+  echo "  ard c ... compile, create bin file"
+  echo "  ard l ... create littleFS bin file"
+  echo " "
+  echo "UPLOAD USB"
+  echo "  ard b ... upload bootloader via USB"
+  echo "  ard u ... upload app and partitionscheme via USB"
+  echo "  ard r ... upload littleFS bin file via USB"
+  echo "  ard p ... upload partition table ONLY via USB"
+  echo " "
+  echo "UPLOAD WiFi"
+  echo "  ard v ... upload app via WiFi"
+  echo "  ard j ... upload littleFS bin file via WiFi"
+  echo " "
+  echo "MONITOR"
+  echo "  ard m ... open serial monitor"
+  echo " "
+fi

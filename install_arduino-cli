@@ -1,0 +1,95 @@
+echo "Install complete environment to handle ESP32 from the command line"
+echo "=================================================================="
+
+cd ~
+
+sudo apt update > /dev/null 2>&1
+sudo apt install python3-pip -y
+
+if groups | grep -qw "dialout"; then
+  echo "OK: The current user is a member of the 'dialout' group."
+else
+  echo "The current user is not a member of the 'dialout' group."
+  echo "add $USER to dialout"
+  sudo usermod -a -G dialout $USER
+  echo "**** logout or reboot to activate the group membership, then run tis script again ***"
+  exit
+fi
+
+echo "*** install arduino-cli ***"
+if [ -f "/usr/local/bin/arduino-cli" ]; then
+    echo "arduino-cli exists, do not install"
+else
+    echo "arduino-cli does NOT exists, install now"
+    curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+    sudo cp ~/bin/arduino-cli /usr/local/bin
+    sudo chmod 755 /usr/local/bin/arduino-cli
+fi
+
+echo "*** add ESP32 support ***"
+if [ -f "$HOME/.arduino15/arduino-cli.yaml" ]; then
+    echo "ESP32 already installed"
+else
+    echo "install ESP32 support"
+    arduino-cli config init
+    echo "board_manager:" >> ~/.arduino15/arduino-cli.yaml
+    echo "  additional_urls:" >> ~/.arduino15/arduino-cli.yaml
+    echo "    - https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json" >> ~/.arduino15/arduino-cli.yaml
+    arduino-cli core update-index
+    arduino-cli core install esp32:esp32
+fi
+
+echo "*** install esptool ***"
+if [ -f "/usr/local/bin/esptool.py" ]; then
+    echo "esptool exists, do not install"
+else
+    echo "esptool does not exist, install"
+    pip3 install esptool
+    sudo cp /home/kurt/.local/bin/esptool.py /usr/local/bin
+    sudo chmod 755 /usr/local/bin/esptool.py
+fi
+
+echo "*** install espota ***"
+if [ -f "/usr/local/bin/espota.py" ]; then
+    echo "espota exists, do not install"
+else
+    echo "espota does no exists, install"
+    wget https://raw.githubusercontent.com/espressif/arduino-esp32/master/tools/espota.py
+    sudo mv espota.py /usr/local/bin
+    sudo chmod 755 /usr/local/bin/espota.py
+fi
+
+echo "*** install LittleFS tools ***"
+if [ -f "/usr/local/bin/mklittlefs" ]; then
+    echo "mklittlefs exists, do not install"
+else
+    echo "mklittlefs does not exists, install"
+    wget https://github.com/earlephilhower/mklittlefs/releases/download/3.1.0/x86_64-linux-gnu-mklittlefs-4aca452.tar.gz
+    tar -xzvf x86_64-linux-gnu-mklittlefs-4aca452.tar.gz --strip-components=1 --wildcards '*/'
+    sudo mv mklittlefs /usr/local/bin
+    sudo chmod 755 /usr/local/bin/mklittlefs
+fi
+
+echo "*** install Libraries (extend if requred with others) ***"
+arduino-cli	lib	install	"Adafruit BME280 Library"
+arduino-cli	lib	install	"Adafruit BMP085 Library"
+arduino-cli	lib	install	"Adafruit BMP280 Library"
+arduino-cli	lib	install	"Adafruit BusIO"
+arduino-cli	lib	install	"Adafruit GFX Library"
+arduino-cli	lib	install	"Adafruit HTU21DF Library"
+arduino-cli	lib	install	"Adafruit MAX31865 library"
+arduino-cli	lib	install	"Adafruit MCP23017 Arduino Library"
+arduino-cli	lib	install	"Adafruit MCP9808 Library"
+arduino-cli	lib	install	"Adafruit SH110X"
+arduino-cli	lib	install	"Adafruit SSD1306"
+arduino-cli	lib	install	"Adafruit TMP117"
+arduino-cli	lib	install	"Adafruit Unified Sensor"
+arduino-cli lib install	ArduinoJson
+arduino-cli lib install	AsyncTCP
+arduino-cli lib install	ESP32Servo
+arduino-cli lib install	ESP32Time
+arduino-cli lib install	ESPAsyncTCP
+arduino-cli lib install	ESPAsyncWebSrv
+arduino-cli lib install	NETSGPClient
+arduino-cli lib install	NTPClient
+arduino-cli lib install AsyncMQTT_ESP32
