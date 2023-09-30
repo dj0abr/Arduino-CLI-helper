@@ -9,7 +9,6 @@ this script is used to install the complete Arduino-CLI framework required for E
 ## ard:
 this script contains all commands which are used to:
 clear the complete flash memory, write the bootloader, write the partition table, flash an application firmware, flash littleFS data. Flashing the firmware and littleFS data can be done via USB or OTA (Wifi). Execute ./ard to get a list of commands. 
-
 These settings should be adapted to your requirements:
 
 BOARD="esp32:esp32:esp32" (you can use that as it is, works with most ESP32 boards)
