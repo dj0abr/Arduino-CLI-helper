@@ -21,3 +21,4 @@ USBPORT="/dev/ttyUSB0" (the serial port, can be left unchanged in most cases)
 
 IPADDRESS="192.168.10.83" (only for OTA: the IP address of your ESP32 board)
 
+there is no need to change the partition addresses. I have tested it with many ESP32 boards, it works fine.
